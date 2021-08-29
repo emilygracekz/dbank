@@ -1,41 +1,96 @@
 import { Tabs, Tab } from 'react-bootstrap'
 import dBank from '../abis/dBank.json'
-import React, { Component } from 'react';
+import React, { Component } from 'react'
 import Token from '../abis/Token.json'
-import dbank from '../dbank.png';
-import Web3 from 'web3';
-import './App.css';
+import dbank from '../dbank.png'
+import Web3 from 'web3'
+import './App.css'
 
 //h0m3w0rk - add new tab to check accrued interest
 
 class App extends Component {
-
   async componentWillMount() {
     await this.loadBlockchainData(this.props.dispatch)
   }
 
   async loadBlockchainData(dispatch) {
+    if (typeof window.ethereum !== 'undefined') {
+      const web3 = new Web3(Web3.givenProvider)
+      const netId = await web3.eth.net.getId()
+      await window.ethereum.enable()
+
+      const accounts = await web3.eth.requestAccounts()
+
+      //if the connection is successful
+      if (accounts !== undefined) {
+        console.log(accounts[0])
+        const balance = await web3.eth.getBalance(accounts[0])
+        console.log(balance)
+        this.setState({ account: accounts[0], balance: balance, web3: web3 })
+      } else {
+        window.alert('Please log in with MetaMask')
+      }
+
+      //Token
+      //Bank
+      try {
+        const token = new web3.eth.Contract(
+          Token.abi,
+          Token.networks[netId].address
+        )
+        const dbank = new web3.eth.Contract(
+          dBank.abi,
+          dBank.networks[netId].address
+        )
+        const dBankAddress = dBank.networks[netId].address
+        this.setState({
+          token: token,
+          dbank: dbank,
+          dBankAddress: dBankAddress,
+        })
+        console.log(dBankAddress)
+      } catch (e) {
+        console.log('Error', e)
+        window.alert('Contracts not deployed to the current network')
+      }
+    } else {
+      window.alert('Please install MetaMask')
+    }
 
     //check if MetaMask exists
 
-      //assign to values to variables: web3, netId, accounts
+    //assign to values to variables: web3, netId, accounts
 
-      //check if account is detected, then load balance&setStates, elsepush alert
+    //check if account is detected, then load balance&setStates, elsepush alert
 
-      //in try block load contracts
+    //in try block load contracts
 
     //if MetaMask not exists push alert
   }
 
   async deposit(amount) {
-    //check if this.state.dbank is ok
-      //in try block call dBank deposit();
+    if (this.state.dbank !== undefined) {
+      try {
+        await this.state.dbank.methods
+          .deposit()
+          .send({ value: amount.toString(), from: this.state.account })
+      } catch (e) {
+        console.log('Error, deposit: ', e)
+      }
+    }
   }
 
   async withdraw(e) {
-    //prevent button from default click
-    //check if this.state.dbank is ok
-    //in try block call dBank withdraw();
+    e.preventDefault()
+    if (this.state.dbank !== undefined) {
+      try {
+        await this.state.dbank.methods
+          .withdraw()
+          .send({ from: this.state.account })
+      } catch (e) {
+        console.log('Error, withdraw ', e)
+      }
+    }
   }
 
   constructor(props) {
@@ -46,43 +101,91 @@ class App extends Component {
       token: null,
       dbank: null,
       balance: 0,
-      dBankAddress: null
+      dBankAddress: null,
+      accounts: '',
     }
   }
 
   render() {
     return (
       <div className='text-monospace'>
-        <nav className="navbar navbar-dark fixed-top bg-dark flex-md-nowrap p-0 shadow">
+        <nav className='navbar navbar-dark fixed-top bg-dark flex-md-nowrap p-0 shadow'>
           <a
-            className="navbar-brand col-sm-3 col-md-2 mr-0"
-            href="http://www.dappuniversity.com/bootcamp"
-            target="_blank"
-            rel="noopener noreferrer"
+            className='navbar-brand col-sm-3 col-md-2 mr-0'
+            href='http://www.dappuniversity.com/bootcamp'
+            target='_blank'
+            rel='noopener noreferrer'
           >
-        <img src={dbank} className="App-logo" alt="logo" height="32"/>
-          <b>dBank</b>
-        </a>
+            <img src={dbank} className='App-logo' alt='logo' height='32' />
+            <b>dBank</b>
+          </a>
         </nav>
-        <div className="container-fluid mt-5 text-center">
-        <br></br>
-          <h1>{/*add welcome msg*/}</h1>
-          <h2>{/*add user address*/}</h2>
+        <div className='container-fluid mt-5 text-center'>
           <br></br>
-          <div className="row">
-            <main role="main" className="col-lg-12 d-flex text-center">
-              <div className="content mr-auto ml-auto">
-              <Tabs defaultActiveKey="profile" id="uncontrolled-tab-example">
-                {/*add Tab deposit*/}
-                {/*add Tab withdraw*/}
-              </Tabs>
+          <h1>Welcome to dBank</h1>
+          <h2>{this.state.account}</h2>
+          <br></br>
+          <div className='row'>
+            <main role='main' className='col-lg-12 d-flex text-center'>
+              <div className='content mr-auto ml-auto'>
+                <Tabs defaultActiveKey='profile' id='uncontrolled-tab-example'>
+                  <Tab eventKey='deposit' title='Deposit'>
+                    <div>
+                      <br></br>
+                      How much do you want to deposit?
+                      <br></br>
+                      (min. ammount is 0.01 ETH)
+                      <br></br>
+                      (1 deposit is possible at this time)
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          let amount = this.depositAmount.value
+                          amount = amount * 10 ** 18 //convert to wei
+                          this.deposit(amount)
+                        }}
+                      >
+                        <div>
+                          <br></br>
+                          <input
+                            id='depositAmount'
+                            step='0.01'
+                            type='number'
+                            className='form-control form-control-md'
+                            placeholder='Amount'
+                            required
+                            ref={(input) => {
+                              this.depositAmount = input
+                            }}
+                          />
+                        </div>
+                        <button type='submit' className='btn btn-primary'>
+                          DEPOSIT
+                        </button>
+                      </form>
+                    </div>
+                  </Tab>
+                  <Tab eventKey='Withdraw' title='Withdraw'>
+                    <div>
+                      <br></br>
+                      Do you want to withdraw + take interest?
+                    </div>
+                    <button
+                      type='submit'
+                      className='btn btn-primary'
+                      onClick={(e) => this.withdraw(e)}
+                    >
+                      WITHDRAW
+                    </button>
+                  </Tab>
+                </Tabs>
               </div>
             </main>
           </div>
         </div>
       </div>
-    );
+    )
   }
 }
 
-export default App;
+export default App
